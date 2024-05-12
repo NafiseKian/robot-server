@@ -31,23 +31,17 @@ void *handle_client(void *arg) {
     }
 
     // Determine if publisher or subscriber
-    if (strcmp(buffer, "ROBOT") == 0) {
-        // Handle robot publishing location
-        while ((read = recv(client_socket, buffer, BUFFER_SIZE, 0)) > 0) {
-            pthread_mutex_lock(&location_mutex);
-            strcpy(latest_location, buffer);
-            printf("latest location is --> %s",latest_location);
-            pthread_mutex_unlock(&location_mutex);
-        }
-    } else if (strcmp(buffer, "APP") == 0) {
-        // Handle app subscribing to location
-        while (1) {
-            pthread_mutex_lock(&location_mutex);
-            strcpy(buffer, latest_location);
-            pthread_mutex_unlock(&location_mutex);
-            send(client_socket, buffer, strlen(buffer), 0);
-            sleep(1);  // Send update every second
-        }
+   if (strncmp(buffer, "ROBOT,", 6) == 0) {
+        char* coordinates = buffer + 6; // Skip the "ROBOT," part to get the coordinates
+
+        pthread_mutex_lock(&location_mutex);
+        strncpy(latest_location, coordinates, sizeof(latest_location) - 1); // Store the coordinates
+        latest_location[sizeof(latest_location) - 1] = '\0'; // Ensure null-termination
+        pthread_mutex_unlock(&location_mutex);
+
+        printf("Latest location is --> %s\n", latest_location);
+    } else if (strncmp(buffer, "APP,", 4) == 0)  {
+        printf("flutter app connected \n");
     }
 
     close(client_socket);

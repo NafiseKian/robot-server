@@ -27,15 +27,10 @@ int main() {
     }
 
     // Send the robot identifier to the server
-    const char* init_msg = "ROBOT";
-    send(sock, init_msg, strlen(init_msg), 0);
+    const char* msg = "ROBOT,10,20";
+    send(sock, msg, strlen(msg), 0);
 
-    // Send location updates
-    for (int i = 0; i < 5; ++i) {
-        std::string location = "Location: " + std::to_string(10 + i) + ", " + std::to_string(20 + i);
-        send(sock, location.c_str(), location.length(), 0);
-        sleep(1);  // wait for 1 second before the next update
-    }
+   
 
     close(sock);
     return 0;
