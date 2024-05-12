@@ -51,14 +51,56 @@ void *handle_client(void *arg) {
     return NULL;
 }
 
+void readConfig(char *ip, int *port) {
+    FILE *fp = fopen(CONFIG_FILE, "r");
+    if (fp == NULL) {
+        perror("Failed to open config file");
+        exit(1);
+    }
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, "IP_ADDRESS=", 11) == 0) {
+            strcpy(ip, line + 11);
+            ip[strcspn(ip, "\n")] = 0; // Remove newline character
+        } else if (strncmp(line, "PORT=", 5) == 0) {
+            *port = atoi(line + 5);
+        }
+    }
+    fclose(fp);
+}
+
 int main() {
+    char ip[20];
+    int port;
+    readConfig(ip, &port); // Read IP address and port from config file
+
     int server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
 
-    pthread_mutex_init(&location_mutex, NULL);
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket < 0) {
+        perror("Failed to create socket");
+        exit(1);
+    }
 
-    // Existing setup code here...
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = inet_addr(ip);
+    server_addr.sin_port = htons(port);
+
+    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Failed to bind");
+        close(server_socket);
+        exit(1);
+    }
+
+    if (listen(server_socket, 10) < 0) {
+        perror("Failed to listen");
+        close(server_socket);
+        exit(1);
+    }
+
+    pthread_mutex_init(&location_mutex, NULL);
 
     // Main loop to accept clients
     while (1) {
@@ -80,5 +122,6 @@ int main() {
 
     // Cleanup
     pthread_mutex_destroy(&location_mutex);
+    close(server_socket);
     return 0;
 }
