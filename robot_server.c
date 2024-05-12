@@ -13,10 +13,12 @@
 char latest_location[256] = "";
 pthread_mutex_t location_mutex;
 
-void *handle_client(void *arg) {
+void *handle_client(void *arg) 
+{
 
     printf("a client is connected\n");
     int client_socket = *(int*)arg;
+    printf("Handling client on socket %d\n", client_socket);
     free(arg);
     char buffer[BUFFER_SIZE];
     ssize_t read;
@@ -30,6 +32,8 @@ void *handle_client(void *arg) {
         return NULL;
     }
 
+    printf("the received data is :  %s",buffer);
+
     // Determine if publisher or subscriber
    if (strncmp(buffer, "ROBOT,", 6) == 0) {
         char* coordinates = buffer + 6; // Skip the "ROBOT," part to get the coordinates
@@ -40,8 +44,13 @@ void *handle_client(void *arg) {
         pthread_mutex_unlock(&location_mutex);
 
         printf("Latest location is --> %s\n", latest_location);
-    } else if (strncmp(buffer, "APP,", 4) == 0)  {
+    } else if (strncmp(buffer, "APP,", 4) == 0) 
+    {
         printf("flutter app connected \n");
+        pthread_mutex_lock(&location_mutex);
+        send(client_socket, latest_location, strlen(latest_location), 0);
+        printf("Sent updated location to APP: %s\n", latest_location);
+        pthread_mutex_unlock(&location_mutex);
     }
 
     close(client_socket);
