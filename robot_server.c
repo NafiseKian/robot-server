@@ -36,6 +36,7 @@ void *handle_client(void *arg) {
         while ((read = recv(client_socket, buffer, BUFFER_SIZE, 0)) > 0) {
             pthread_mutex_lock(&location_mutex);
             strcpy(latest_location, buffer);
+            printf("latest location is --> %s",latest_location);
             pthread_mutex_unlock(&location_mutex);
         }
     } else if (strcmp(buffer, "APP") == 0) {
