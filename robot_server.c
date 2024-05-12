@@ -14,6 +14,8 @@ char latest_location[256] = "";
 pthread_mutex_t location_mutex;
 
 void *handle_client(void *arg) {
+
+    printf("a client is connected\n");
     int client_socket = *(int*)arg;
     free(arg);
     char buffer[BUFFER_SIZE];
