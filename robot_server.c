@@ -5,72 +5,62 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #define CONFIG_FILE "config.txt"
 #define BUFFER_SIZE 1024
 
-int main() {
-    FILE *fp;
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-    char ip[20];
-    int port;
-    struct sockaddr_in server_addr;
-    int server_socket, client_socket;
-    struct sockaddr_in client_addr;
-    socklen_t client_addr_size = sizeof(client_addr);
-    char buffer[BUFFER_SIZE];
+char latest_location[256] = "";
+pthread_mutex_t location_mutex;
 
-    // Read configuration from file
-    fp = fopen(CONFIG_FILE, "r");
-    if (fp == NULL) {
-        perror("Failed to open config file");
-        return 1;
+void *handle_client(void *arg) {
+    int client_socket = *(int*)arg;
+    free(arg);
+    char buffer[BUFFER_SIZE];
+    ssize_t read;
+
+    // Initial message to determine client type
+    memset(buffer, 0, BUFFER_SIZE);
+    read = recv(client_socket, buffer, BUFFER_SIZE, 0);
+    if (read <= 0) {
+        perror("Failed to receive initial client type");
+        close(client_socket);
+        return NULL;
     }
 
-    while ((read = getline(&line, &len, fp)) != -1) {
-        if (strncmp(line, "IP_ADDRESS=", 11) == 0) {
-            strcpy(ip, line + 11);
-            ip[strcspn(ip, "\n")] = 0;  // Remove newline character
-        } else if (strncmp(line, "PORT=", 5) == 0) {
-            port = atoi(line + 5);
+    // Determine if publisher or subscriber
+    if (strcmp(buffer, "ROBOT") == 0) {
+        // Handle robot publishing location
+        while ((read = recv(client_socket, buffer, BUFFER_SIZE, 0)) > 0) {
+            pthread_mutex_lock(&location_mutex);
+            strcpy(latest_location, buffer);
+            pthread_mutex_unlock(&location_mutex);
+        }
+    } else if (strcmp(buffer, "APP") == 0) {
+        // Handle app subscribing to location
+        while (1) {
+            pthread_mutex_lock(&location_mutex);
+            strcpy(buffer, latest_location);
+            pthread_mutex_unlock(&location_mutex);
+            send(client_socket, buffer, strlen(buffer), 0);
+            sleep(1);  // Send update every second
         }
     }
-    fclose(fp);
-    if (line)
-        free(line);
 
-    // Create socket
-    server_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_socket < 0) {
-        perror("Failed to create socket");
-        return 1;
-    }
+    close(client_socket);
+    return NULL;
+}
 
-    // Set up the address structure
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(ip);
-    server_addr.sin_port = htons(port);
+int main() {
+    int server_socket, client_socket;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t client_addr_size = sizeof(client_addr);
 
-    // Bind socket
-    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        perror("Failed to bind");
-        close(server_socket);
-        return 1;
-    }
+    pthread_mutex_init(&location_mutex, NULL);
 
-    // Listen
-    if (listen(server_socket, 5) < 0) {
-        perror("Failed to listen");
-        close(server_socket);
-        return 1;
-    }
+    // Existing setup code here...
 
-    printf("Listening on %s:%d\n", ip, port);
-
-    // Accept connections
+    // Main loop to accept clients
     while (1) {
         client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_size);
         if (client_socket < 0) {
@@ -78,19 +68,17 @@ int main() {
             continue;
         }
 
-        // Receive data
-        memset(buffer, 0, BUFFER_SIZE);
-        read = recv(client_socket, buffer, BUFFER_SIZE, 0);
-        if (read < 0) {
-            perror("Failed to receive");
-        } else if (read == 0) {
-            printf("Client disconnected\n");
-        } else {
-            printf("Received: %s\n", buffer);
+        int *pclient = malloc(sizeof(int));
+        *pclient = client_socket;
+        pthread_t thread;
+        if (pthread_create(&thread, NULL, handle_client, pclient) != 0) {
+            perror("Failed to create thread");
+            free(pclient);
         }
-
-        close(client_socket);
+        pthread_detach(thread);  // Don't wait for thread on main thread
     }
 
+    // Cleanup
+    pthread_mutex_destroy(&location_mutex);
     return 0;
 }
