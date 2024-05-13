@@ -13,44 +13,37 @@
 char latest_location[256] = "";
 pthread_mutex_t location_mutex;
 
-void *handle_client(void *arg) 
-{
-
-    printf("a client is connected\n");
+void *handle_client(void *arg) {
     int client_socket = *(int*)arg;
-    printf("Handling client on socket %d\n", client_socket);
     free(arg);
     char buffer[BUFFER_SIZE];
     ssize_t read;
 
-    // Initial message to determine client type
+    printf("Client connected on socket %d\n", client_socket);
+
     memset(buffer, 0, BUFFER_SIZE);
     read = recv(client_socket, buffer, BUFFER_SIZE, 0);
     if (read <= 0) {
-        perror("Failed to receive initial client type");
+        perror("Failed to receive data from client");
         close(client_socket);
         return NULL;
     }
 
-    printf("the received data is :  %s",buffer);
+    printf("Received data: %s\n", buffer);
 
-    // Determine if publisher or subscriber
-   if (strncmp(buffer, "ROBOT,", 6) == 0) {
-        char* coordinates = buffer + 6; // Skip the "ROBOT," part to get the coordinates
-
+    if (strncmp(buffer, "ROBOT,", 6) == 0) {
         pthread_mutex_lock(&location_mutex);
-        strncpy(latest_location, coordinates, sizeof(latest_location) - 1); // Store the coordinates
-        latest_location[sizeof(latest_location) - 1] = '\0'; // Ensure null-termination
+        strncpy(latest_location, buffer + 6, sizeof(latest_location) - 1);
+        latest_location[sizeof(latest_location) - 1] = '\0';
         pthread_mutex_unlock(&location_mutex);
-
-        printf("Latest location is --> %s\n", latest_location);
-    } else if (strncmp(buffer, "APP,", 4) == 0) 
-    {
-        printf("flutter app connected \n");
-        pthread_mutex_lock(&location_mutex);
-        send(client_socket, latest_location, strlen(latest_location), 0);
-        printf("Sent updated location to APP: %s\n", latest_location);
-        pthread_mutex_unlock(&location_mutex);
+        printf("Updated latest location: %s\n", latest_location);
+    } else if (strncmp(buffer, "APP,STATUS", 10) == 0) {
+        // Simulate sending battery level and trash status
+        char *status = "{\"battery\": 75.5, \"trash\": 40}";
+        send(client_socket, status, strlen(status), 0);
+        printf("Sent status to APP: %s\n", status);
+    } else {
+        printf("Received unknown command\n");
     }
 
     close(client_socket);
@@ -67,7 +60,7 @@ void readConfig(char *ip, int *port) {
     while (fgets(line, sizeof(line), fp)) {
         if (strncmp(line, "IP_ADDRESS=", 11) == 0) {
             strcpy(ip, line + 11);
-            ip[strcspn(ip, "\n")] = 0; // Remove newline character
+            ip[strcspn(ip, "\n")] = 0;
         } else if (strncmp(line, "PORT=", 5) == 0) {
             *port = atoi(line + 5);
         }
@@ -78,7 +71,7 @@ void readConfig(char *ip, int *port) {
 int main() {
     char ip[20];
     int port;
-    readConfig(ip, &port); // Read IP address and port from config file
+    readConfig(ip, &port);
 
     int server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
@@ -108,25 +101,22 @@ int main() {
 
     pthread_mutex_init(&location_mutex, NULL);
 
-    // Main loop to accept clients
+    printf("Server is running on IP %s at port %d\n", ip, port);
+
     while (1) {
         client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_size);
         if (client_socket < 0) {
-            perror("Failed to accept");
+            perror("Failed to accept client");
             continue;
         }
 
         int *pclient = malloc(sizeof(int));
         *pclient = client_socket;
         pthread_t thread;
-        if (pthread_create(&thread, NULL, handle_client, pclient) != 0) {
-            perror("Failed to create thread");
-            free(pclient);
-        }
-        pthread_detach(thread);  // Don't wait for thread on main thread
+        pthread_create(&thread, NULL, handle_client, pclient);
+        pthread_detach(thread);
     }
 
-    // Cleanup
     pthread_mutex_destroy(&location_mutex);
     close(server_socket);
     return 0;
