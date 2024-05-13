@@ -10,8 +10,10 @@
 #define CONFIG_FILE "config.txt"
 #define BUFFER_SIZE 1024
 
-char latest_location[256] = "";
+char latest_location[256] = "Unknown Location";
 pthread_mutex_t location_mutex;
+double batteryLevel = 88.7;  //tset
+double trashLevel = 35.4;    
 
 void *handle_client(void *arg) {
     int client_socket = *(int*)arg;
@@ -19,7 +21,7 @@ void *handle_client(void *arg) {
     char buffer[BUFFER_SIZE];
     ssize_t read;
 
-    printf("Client connected on socket %d\n", client_socket);
+    printf("Handling client on socket %d\n", client_socket);
 
     memset(buffer, 0, BUFFER_SIZE);
     read = recv(client_socket, buffer, BUFFER_SIZE, 0);
@@ -29,21 +31,19 @@ void *handle_client(void *arg) {
         return NULL;
     }
 
-    printf("Received data: %s\n", buffer);
+    printf("Received command: %s\n", buffer);
 
-    if (strncmp(buffer, "ROBOT,", 6) == 0) {
+    if (strncmp(buffer, "APP,STATUS", 10) == 0) {
+        char response[512]; 
         pthread_mutex_lock(&location_mutex);
-        strncpy(latest_location, buffer + 6, sizeof(latest_location) - 1);
-        latest_location[sizeof(latest_location) - 1] = '\0';
+        snprintf(response, sizeof(response), "{\"battery\": %.1f, \"trash\": %.1f, \"location\": \"%s\"}",
+                 batteryLevel, trashLevel, latest_location);
         pthread_mutex_unlock(&location_mutex);
-        printf("Updated latest location: %s\n", latest_location);
-    } else if (strncmp(buffer, "APP,STATUS", 10) == 0) {
-        // Simulate sending battery level and trash status
-        char *status = "{\"battery\": 75.5, \"trash\": 40}";
-        send(client_socket, status, strlen(status), 0);
-        printf("Sent status to APP: %s\n", status);
+
+        send(client_socket, response, strlen(response), 0);
+        printf("Sent status to APP: %s\n", response);
     } else {
-        printf("Received unknown command\n");
+        printf("Unknown command received.\n");
     }
 
     close(client_socket);
