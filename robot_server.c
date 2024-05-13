@@ -32,10 +32,10 @@ void *handle_client(void *arg) {
 
     printf("Received data: %s\n", buffer);
 
-      if (strncmp(buffer, "ROBOT,", 6) == 0) {
+ if (strncmp(buffer, "ROBOT,", 6) == 0) {
         double lat, lon;
         sscanf(buffer + 6, "%lf,%lf,%lf,%lf", &batteryLevel, &trashLevel, &lat, &lon);
-        snprintf(latest_location, sizeof(latest_location), "%lf,%lf", lat, lon);
+        snprintf(latest_location, sizeof(latest_location), "%.2lf,%.2lf", lat, lon);
         printf("Received updates - Battery: %.1f, Trash: %.1f, Location: %s\n", batteryLevel, trashLevel, latest_location);
     } else if (strncmp(buffer, "APP,STATUS", 10) == 0) {
         char response[512];
