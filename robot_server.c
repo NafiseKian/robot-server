@@ -12,10 +12,9 @@
 
 char latest_location[256] = "";
 pthread_mutex_t location_mutex;
-double batteryLevel = 0.0;
-double trashLevel = 0.0;
-double lat = 0.0;
-double lon = 0.0;
+double x = 0.0;
+double y = 0.0;
+
 
 void *handle_client(void *arg) {
     int client_socket = *(int*)arg;
@@ -36,13 +35,13 @@ void *handle_client(void *arg) {
     printf("Received data: %s\n", buffer);
 
     if (strncmp(buffer, "ROBOT,", 6) == 0) {
-        sscanf(buffer + 6, "%lf,%lf,%lf,%lf", &batteryLevel, &trashLevel, &lat, &lon);
-        snprintf(latest_location, sizeof(latest_location), "%.2lf,%.2lf", lat, lon);
-        printf("Received updates - Battery: %.1f, Trash: %.1f, Location: %s\n", batteryLevel, trashLevel, latest_location);
+        sscanf(buffer + 6, "%lf,%lf,%lf,%lf", &x, &y);
+        snprintf(latest_location, sizeof(latest_location), "%.2lf,%.2lf", x, y);
+        printf("Received updates - X: %.1f, Y: %.1f\n", x, y);
     } else if (strncmp(buffer, "APP,STATUS", 10) == 0) {
         char response[512];
-        snprintf(response, sizeof(response), "{\"battery\": %.1f, \"trash\": %.1f, \"location\": \"%s\", \"x\": %.2lf, \"y\": %.2lf}",
-                 batteryLevel, trashLevel, latest_location, lat, lon);
+        snprintf(response, sizeof(response), "{\"x\": %.1f, \"y\": %.1f}",
+                 x, y);
         send(client_socket, response, strlen(response), 0);
         printf("Sent status to APP: %s\n", response);
     } else {
