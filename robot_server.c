@@ -14,7 +14,7 @@ char latest_location[256] = "";
 pthread_mutex_t location_mutex;
 double x = 0.0;
 double y = 0.0;
-int z = 0 ; 
+double z = 0 ; 
 
 
 void *handle_client(void *arg) {
@@ -37,11 +37,11 @@ void *handle_client(void *arg) {
 
     if (strncmp(buffer, "ROBOT,", 6) == 0) {
         sscanf(buffer + 6, "%lf,%lf,%lf,%lf", &x, &y , &z);
-        snprintf(latest_location, sizeof(latest_location), "%.2lf,%.2lf,%d", x, y , z);
-        printf("Received updates - X: %.1f, Y: %.1f , Z: %d\n", x, y,z);
+        snprintf(latest_location, sizeof(latest_location), "%.2lf,%.2lf,%.2lf", x, y , z);
+        printf("Received updates - X: %.1f, Y: %.1f , Z: %.1f\n", x, y,z);
     } else if (strncmp(buffer, "APP,STATUS", 10) == 0) {
         char response[512];
-        snprintf(response, sizeof(response), "{\"x\": %.1f, \"y\": %.1f, \"z\": %d}",x, y ,z );
+        snprintf(response, sizeof(response), "{\"x\": %.1f, \"y\": %.1f, \"z\": %.1f}",x, y ,z );
         send(client_socket, response, strlen(response), 0);
         printf("Sent status to APP: %s\n", response);
     } else {
